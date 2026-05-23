@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "task": "resume_quality_scoring",
+  "scoring_rubric": {
+    "ats_score": {
+      "range": "0-100",
+      "criteria": {
+        "sections_complete": 20,
+        "keywords_match": 25,
+        "quantified_achievements": 20,
+        "formatting": 20,
+        "action_verbs": 15
+      }
+    },
+    "quality_labels": {
+      "poor": "0-40",
+      "average": "41-70",
+      "good": "71-85",
+      "excellent": "86-100"
+    },
+    "sections": {
+      "required": ["experience", "education", "skills"],
+      "optional": ["summary", "projects", "certifications", "languages"]
+    }
+  },
+  "entities": {
+    "SKILL": "Technical or soft skill",
+    "COMPANY": "Employer name",
+    "DEGREE": "Educational qualification",
+    "DURATION": "Time period (e.g. 2020-2023)",
+    "METRIC": "Quantified achievement (e.g. 40% increase)",
+    "TOOL": "Software or platform name"
+  },
+  "categories": [
+    "Software Engineer", "Data Science", "DevOps",
+    "Network Engineer", "IT Support", "Web Designer",
+    "Business Analyst", "Finance", "Marketing",
+    "Human Resources", "Education", "Healthcare"
+  ]
+}
