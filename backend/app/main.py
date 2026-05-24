@@ -14,6 +14,7 @@ from app.utils.parser import ResumeParser, ResumeTextCleaner  # noqa: E402
 from app.utils.segmenter import ResumeSectionSegmenter  # noqa: E402
 from app.utils.skill_extractor import SkillExtractor  # noqa: E402
 from app.ml.job_matcher import JobMatcher  # noqa: E402
+from app.ml.pipeline import run_pipeline  # noqa: E402
 
 app = FastAPI(title="ResumeVibe API", version="1.0.0")
 
@@ -227,6 +228,50 @@ async def match_resume(
         return {
             "file_name": parsed["file_name"],
             **result,
+            "status": "success",
+        }
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/pipeline")
+async def pipeline_analyze(
+    file: UploadFile = File(...),
+    job_description: str = "",
+):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        result = run_pipeline(
+            tmp_path,
+            job_description if job_description.strip() else None,
+        )
+
+        if result["status"] == "error":
+            raise HTTPException(500, result.get("error", "Pipeline failed"))
+
+        return {
+            "file_name": result["file_name"],
+            "word_count": result["word_count"],
+            "ats_score": result["ats_score"],
+            "quality_label": result["quality_label"],
+            "improvements": result["improvements"],
+            "section_stats": result["section_stats"],
+            "skills": result["skills"],
+            "llm_skills": result["llm_skills"],
+            "llm_feedback": result["llm_feedback"],
+            "match_score": result["match_score"],
+            "match_level": result["match_level"],
             "status": "success",
         }
     finally:
