@@ -1,0 +1,48 @@
+{
+  "test": "A/B Test \u2014 Groq Baseline vs QLoRA",
+  "results": [
+    {
+      "id": "python_dev",
+      "weak": "Did Python programming and made some scripts",
+      "reference": "Developed Python automation scripts reducing manual work by 60%",
+      "groq_output": "* Designed and developed 15+ Python scripts, leveraging libraries such as NumPy and Pandas, to automate data processing tasks and increase efficiency by 30% within a 6-month period.",
+      "groq_rouge": 17.1,
+      "groq_keyword": 50.0,
+      "qlora_note": "QLoRA model requires GPU inference \u2014 evaluated qualitatively on Colab"
+    },
+    {
+      "id": "network_eng",
+      "weak": "Did network setup and IT support for company",
+      "reference": "Configured Cisco routers for 500+ user enterprise network maintaining 99.9% uptime",
+      "groq_output": "* Designed, implemented, and managed network infrastructure for 500+ employees, resulting in 99.9% uptime and a 40% reduction in IT support requests, utilizing expertise in TCP/IP, DNS, and Active Directory to ensure seamless system operations and enhance overall network security and performance.",
+      "groq_rouge": 21.7,
+      "groq_keyword": 50.0,
+      "qlora_note": "QLoRA model requires GPU inference \u2014 evaluated qualitatively on Colab"
+    },
+    {
+      "id": "data_analyst",
+      "weak": "Worked on data analysis and made reports",
+      "reference": "Analyzed 1M+ records using Python/Pandas, delivering insights that increased revenue by 25%",
+      "groq_output": "* Utilized data analysis techniques to drive business insights, generating 25+ detailed reports per quarter that informed strategic decision-making and resulted in a 30% increase in data-driven initiatives.",
+      "groq_rouge": 5.1,
+      "groq_keyword": 25.0,
+      "qlora_note": "QLoRA model requires GPU inference \u2014 evaluated qualitatively on Colab"
+    },
+    {
+      "id": "customer_support",
+      "weak": "Helped customers with their problems",
+      "reference": "Resolved 50+ daily support tickets maintaining 95% customer satisfaction rate",
+      "groq_output": "* Resolved an average of 25 customer complaints per week, achieving a 95% customer satisfaction rate and reducing issue escalation by 30% through effective problem-solving and communication skills.",
+      "groq_rouge": 27.8,
+      "groq_keyword": 25.0,
+      "qlora_note": "QLoRA model requires GPU inference \u2014 evaluated qualitatively on Colab"
+    }
+  ],
+  "summary": {
+    "groq_avg_rouge": 17.925,
+    "groq_avg_keyword": 37.5,
+    "best_model_production": "groq/llama-3.3-70b-versatile",
+    "best_model_finetuned": "mahabub-unlocked/resumevibe-lora",
+    "recommendation": "Use Groq for production (better quality). Use QLoRA for offline/edge deployment."
+  }
+}
