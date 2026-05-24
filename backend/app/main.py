@@ -25,6 +25,8 @@ from app.db.supabase_client import supabase  # noqa: E402
 from fastapi import Request  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 from fastapi import WebSocket  # noqa: E402
+from app.ml.job_scraper import search_jobs_for_resume  # noqa: E402
+from pydantic import BaseModel as PydanticBase  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -34,6 +36,12 @@ class CheckoutRequest(BaseModel):
 
 class PortalRequest(BaseModel):
     customer_id: str
+
+
+class JobSearchRequest(PydanticBase):
+    job_titles: list
+    skills: list
+    location: str = "Remote"
 
 
 app = FastAPI(title="ResumeVibe API", version="1.0.0")
@@ -501,3 +509,13 @@ async def websocket_analyze(websocket: WebSocket):
         )
     finally:
         await websocket.close()
+
+
+@app.post("/api/jobs/search")
+async def search_jobs(req: JobSearchRequest):
+    result = search_jobs_for_resume(
+        req.job_titles,
+        req.skills,
+        req.location,
+    )
+    return result

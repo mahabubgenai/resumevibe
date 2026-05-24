@@ -1,16 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { analyzeResume, matchJob } from "@/lib/api";
 import { ResumeAnalysis, JobMatch } from "@/types";
-
-const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/analyze";
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import JobSuggestions from "@/components/resume/JobSuggestions";
 
 interface ProgressStep {
   step: number;
@@ -27,7 +23,6 @@ export default function AnalyzePage() {
   const [matchResult, setMatchResult] = useState<JobMatch | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [steps, setSteps] = useState<ProgressStep[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
 
   const STEP_LABELS = [
     "Parse Resume",
@@ -58,13 +53,12 @@ export default function AnalyzePage() {
     maxFiles: 1,
   });
 
-  // Initialize steps
   const initSteps = () => {
     setSteps(
       STEP_LABELS.map((label, i) => ({
         step: i + 1,
         total: 5,
-        status: "waiting",
+        status: "waiting" as const,
         message: label,
       }))
     );
@@ -81,12 +75,10 @@ export default function AnalyzePage() {
     initSteps();
 
     try {
-      // Upload file first — get temp path via REST
       const result = await analyzeResume(file);
 
-      // Simulate WebSocket progress
       const progressSteps = [
-        { step: 1, message: `📄 Parsing resume...` },
+        { step: 1, message: "📄 Parsing resume..." },
         { step: 1, message: `✅ Parsed (${result.word_count} words)` },
         { step: 2, message: "🔍 Extracting sections & skills..." },
         {
@@ -112,7 +104,9 @@ export default function AnalyzePage() {
             step.step === s.step
               ? {
                   ...step,
-                  status: s.message.startsWith("✅") ? "done" : "running",
+                  status: s.message.startsWith("✅")
+                    ? ("done" as const)
+                    : ("running" as const),
                   message: s.message,
                 }
               : step
@@ -317,9 +311,9 @@ export default function AnalyzePage() {
           </div>
 
           {/* Right — Results */}
-          <div>
+          <div className="space-y-6">
             {!analysis ? (
-              <div className="h-full flex items-center justify-center">
+              <div className="h-64 flex items-center justify-center">
                 <div className="text-center text-gray-600">
                   <div className="text-6xl mb-4">🤖</div>
                   <p className="text-lg">
@@ -328,7 +322,7 @@ export default function AnalyzePage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <>
                 {/* Score Cards */}
                 <div className="grid grid-cols-2 gap-4">
                   <div
@@ -347,7 +341,7 @@ export default function AnalyzePage() {
                     </div>
                   </div>
 
-                  {matchResult && (
+                  {matchResult ? (
                     <div
                       className={`border rounded-2xl p-6 text-center ${scoreBg(matchResult.match_score)}`}
                     >
@@ -363,6 +357,18 @@ export default function AnalyzePage() {
                         className={`text-xs font-semibold mt-1 capitalize ${scoreColor(matchResult.match_score)}`}
                       >
                         {matchResult.match_level}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border border-gray-800 rounded-2xl p-6 text-center">
+                      <div className="text-5xl font-black text-gray-600">
+                        —
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Job Match
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        Add job description
                       </div>
                     </div>
                   )}
@@ -387,7 +393,7 @@ export default function AnalyzePage() {
 
                 {/* Tabs */}
                 <div className="flex gap-2 border-b border-gray-800 pb-2">
-                  {["overview", "skills", "feedback", "improve"].map((tab) => (
+                  {['overview', 'skills', 'feedback', 'improve', 'jobs finder'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -410,7 +416,9 @@ export default function AnalyzePage() {
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-gray-400">File</span>
-                          <span>{analysis.file_name}</span>
+                          <span className="text-right truncate ml-4">
+                            {analysis.file_name}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-400">Word Count</span>
@@ -424,7 +432,7 @@ export default function AnalyzePage() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-400">Job Titles</span>
-                          <span className="text-right text-xs">
+                          <span className="text-right text-xs ml-4">
                             {analysis.llm_skills.job_titles
                               .slice(0, 2)
                               .join(", ")}
@@ -585,8 +593,15 @@ export default function AnalyzePage() {
                       )}
                     </div>
                   )}
+
+                  {activeTab === "jobs" && (
+                    <JobSuggestions
+                      jobTitles={analysis.llm_skills.job_titles}
+                      skills={analysis.llm_skills.skills.technical.slice(0, 5)}
+                    />
+                  )}
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
