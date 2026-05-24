@@ -324,6 +324,32 @@ export default function AnalyzePage() {
               </div>
             ) : (
               <>
+                {/* Export Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={async () => {
+                      if (!file) return;
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/resume/export-pdf`,
+                        { method: "POST", body: formData }
+                      );
+                      const blob = await response.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "resumevibe-analysis.pdf";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success("PDF downloaded!");
+                    }}
+                    className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-4 py-2 rounded-xl transition"
+                  >
+                    Download Report PDF
+                  </button>
+                </div>
+
                 {/* Score Cards */}
                 <div className="grid grid-cols-2 gap-4">
                   <div

@@ -28,6 +28,8 @@ from fastapi import WebSocket  # noqa: E402
 from app.ml.job_scraper import search_jobs_for_resume  # noqa: E402
 from pydantic import BaseModel as PydanticBase  # noqa: E402
 from app.ml.rag_pipeline import rag_pipeline  # noqa: E402
+from app.utils.pdf_generator import generate_analysis_pdf  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -552,5 +554,65 @@ async def get_rag_tips(file: UploadFile = File(...), job_title: str = ""):
         clean_text = cleaner.clean(parsed["raw_text"])
         tips = rag_pipeline.get_improvement_tips(clean_text, job_title)
         return {"tips": tips, "status": "success"}
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/export-pdf")
+async def export_analysis_pdf(file: UploadFile = File(...), job_description: str = ""):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        sections = segmenter.segment(clean_text)
+        section_stats = segmenter.get_section_stats(sections)
+
+        features = _extract_features(
+            clean_text, section_stats, sections, parsed["word_count"]
+        )
+        ats_score = ats_predictor.predict(features)
+        quality = _quality_label(ats_score)
+        llm_skills = llm_analyzer.extract_skills(clean_text)
+        llm_feedback = llm_analyzer.get_ats_feedback(clean_text, ats_score, quality)
+
+        match_score = None
+        match_level = None
+        if job_description.strip():
+            match_result = job_matcher.match(clean_text, job_description)
+            match_score = match_result["match_score"]
+            match_level = match_result["match_level"]
+
+        analysis_data = {
+            "file_name": parsed["file_name"],
+            "word_count": parsed["word_count"],
+            "ats_score": ats_score,
+            "quality_label": quality,
+            "section_stats": section_stats,
+            "llm_skills": llm_skills,
+            "llm_feedback": llm_feedback,
+            "match_score": match_score,
+            "match_level": match_level,
+        }
+
+        pdf_bytes = generate_analysis_pdf(analysis_data)
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=resumevibe-analysis.pdf"
+            },
+        )
     finally:
         os.unlink(tmp_path)
