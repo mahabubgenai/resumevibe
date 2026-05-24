@@ -15,6 +15,24 @@ from app.utils.segmenter import ResumeSectionSegmenter  # noqa: E402
 from app.utils.skill_extractor import SkillExtractor  # noqa: E402
 from app.ml.job_matcher import JobMatcher  # noqa: E402
 from app.ml.pipeline import run_pipeline  # noqa: E402
+from app.payments.stripe_handler import (  # noqa: E402
+    create_checkout_session,
+    create_portal_session,
+    handle_webhook,
+)
+from app.db.supabase_client import supabase  # noqa: E402
+from fastapi import Request  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+
+
+class CheckoutRequest(BaseModel):
+    user_id: str
+    email: str
+
+
+class PortalRequest(BaseModel):
+    customer_id: str
+
 
 app = FastAPI(title="ResumeVibe API", version="1.0.0")
 
@@ -276,3 +294,40 @@ async def pipeline_analyze(
         }
     finally:
         os.unlink(tmp_path)
+
+
+@app.post("/api/payments/checkout")
+async def create_checkout(req: CheckoutRequest):
+    url = create_checkout_session(req.user_id, req.email)
+    return {"url": url}
+
+
+@app.post("/api/payments/portal")
+async def billing_portal(req: PortalRequest):
+    url = create_portal_session(req.customer_id)
+    return {"url": url}
+
+
+@app.post("/api/payments/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    result = handle_webhook(payload, sig_header)
+
+    if result.get("event") == "subscription_created":
+        supabase.table("subscriptions").upsert(
+            {
+                "user_id": result["user_id"],
+                "stripe_customer_id": result["customer_id"],
+                "stripe_subscription_id": result["subscription_id"],
+                "plan": "pro",
+                "status": "active",
+            }
+        ).execute()
+
+    if result.get("event") == "subscription_cancelled":
+        supabase.table("subscriptions").update(
+            {"plan": "free", "status": "cancelled"}
+        ).eq("stripe_subscription_id", result["subscription_id"]).execute()
+
+    return {"status": "ok"}
