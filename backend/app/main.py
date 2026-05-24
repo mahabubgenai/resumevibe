@@ -13,6 +13,7 @@ from app.ml.llm_analyzer import LLMResumeAnalyzer  # noqa: E402
 from app.utils.parser import ResumeParser, ResumeTextCleaner  # noqa: E402
 from app.utils.segmenter import ResumeSectionSegmenter  # noqa: E402
 from app.utils.skill_extractor import SkillExtractor  # noqa: E402
+from app.ml.job_matcher import JobMatcher  # noqa: E402
 
 app = FastAPI(title="ResumeVibe API", version="1.0.0")
 
@@ -30,6 +31,7 @@ segmenter = ResumeSectionSegmenter()
 extractor = SkillExtractor()
 ats_predictor = ATSPredictor()
 llm_analyzer = LLMResumeAnalyzer()
+job_matcher = JobMatcher()
 
 
 @app.get("/")
@@ -194,6 +196,37 @@ async def analyze_resume(file: UploadFile = File(...)):
             "section_stats": section_stats,
             "llm_skills": llm_skills,
             "llm_feedback": llm_feedback,
+            "status": "success",
+        }
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/match")
+async def match_resume(
+    resume: UploadFile = File(...),
+    job_description: str = "Software Engineer with Python experience",
+):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if resume.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in resume.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await resume.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        result = job_matcher.match(clean_text, job_description)
+
+        return {
+            "file_name": parsed["file_name"],
+            **result,
             "status": "success",
         }
     finally:
