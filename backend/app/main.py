@@ -27,6 +27,7 @@ from pydantic import BaseModel  # noqa: E402
 from fastapi import WebSocket  # noqa: E402
 from app.ml.job_scraper import search_jobs_for_resume  # noqa: E402
 from pydantic import BaseModel as PydanticBase  # noqa: E402
+from app.ml.rag_pipeline import rag_pipeline  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -42,6 +43,11 @@ class JobSearchRequest(PydanticBase):
     job_titles: list
     skills: list
     location: str = "Remote"
+
+
+class RAGQuestionRequest(BaseModel):
+    question: str
+    resume_text: str = ""
 
 
 app = FastAPI(title="ResumeVibe API", version="1.0.0")
@@ -519,3 +525,32 @@ async def search_jobs(req: JobSearchRequest):
         req.location,
     )
     return result
+
+
+@app.post("/api/rag/ask")
+async def ask_rag(req: RAGQuestionRequest):
+    answer = rag_pipeline.answer_question(req.question, req.resume_text)
+    return {"answer": answer, "status": "success"}
+
+
+@app.post("/api/rag/tips")
+async def get_rag_tips(file: UploadFile = File(...), job_title: str = ""):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        tips = rag_pipeline.get_improvement_tips(clean_text, job_title)
+        return {"tips": tips, "status": "success"}
+    finally:
+        os.unlink(tmp_path)

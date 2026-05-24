@@ -7,6 +7,7 @@ import Link from "next/link";
 import { analyzeResume, matchJob } from "@/lib/api";
 import { ResumeAnalysis, JobMatch } from "@/types";
 import JobSuggestions from "@/components/resume/JobSuggestions";
+import RAGChat from "@/components/resume/RAGChat";
 
 interface ProgressStep {
   step: number;
@@ -392,8 +393,8 @@ export default function AnalyzePage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 border-b border-gray-800 pb-2">
-                  {['overview', 'skills', 'feedback', 'improve', 'jobs finder'].map((tab) => (
+                <div className="flex gap-2 border-b border-gray-800 pb-2 flex-wrap">
+                  {["overview", "skills", "feedback", "improve", "job finder", "coach"].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -594,11 +595,15 @@ export default function AnalyzePage() {
                     </div>
                   )}
 
-                  {activeTab === "jobs" && (
+                  {activeTab === "job finder" && (
                     <JobSuggestions
                       jobTitles={analysis.llm_skills.job_titles}
                       skills={analysis.llm_skills.skills.technical.slice(0, 5)}
                     />
+                  )}
+
+                  {activeTab === "coach" && (
+                    <RAGChat resumeText={analysis.llm_skills.key_achievements.join(" ")} />
                   )}
                 </div>
               </>
