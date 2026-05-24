@@ -1,0 +1,66 @@
+{
+  "phase": "Phase 4 - Experiment Evaluation",
+  "ats_predictor": {
+    "results": [
+      {
+        "resume": "software_engineer",
+        "ats_score": 63.7,
+        "predicted": "average",
+        "expected": "good",
+        "correct": false
+      },
+      {
+        "resume": "network_engineer",
+        "ats_score": 59.2,
+        "predicted": "average",
+        "expected": "average",
+        "correct": true
+      },
+      {
+        "resume": "weak_resume",
+        "ats_score": 5.1,
+        "predicted": "poor",
+        "expected": "poor",
+        "correct": true
+      }
+    ],
+    "accuracy": 66.66666666666666
+  },
+  "job_matcher": {
+    "results": [
+      {
+        "pair": "software_engineer\u2192python_developer",
+        "score": 68.3,
+        "expected": "high",
+        "correct": true
+      },
+      {
+        "pair": "network_engineer\u2192network_engineer",
+        "score": 80.1,
+        "expected": "high",
+        "correct": true
+      },
+      {
+        "pair": "weak_resume\u2192python_developer",
+        "score": 40.0,
+        "expected": "low",
+        "correct": true
+      }
+    ],
+    "accuracy": 100.0
+  },
+  "llm_analyzer": {
+    "results": [
+      {
+        "resume": "software_engineer",
+        "tech_skills": 3,
+        "has_suggestions": true
+      },
+      {
+        "resume": "network_engineer",
+        "tech_skills": 7,
+        "has_suggestions": true
+      }
+    ]
+  }
+}
