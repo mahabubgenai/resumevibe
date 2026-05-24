@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+import asyncio  # noqa: E402
 
 from dotenv import load_dotenv
 
@@ -23,6 +24,7 @@ from app.payments.stripe_handler import (  # noqa: E402
 from app.db.supabase_client import supabase  # noqa: E402
 from fastapi import Request  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
+from fastapi import WebSocket  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -331,3 +333,171 @@ async def stripe_webhook(request: Request):
         ).eq("stripe_subscription_id", result["subscription_id"]).execute()
 
     return {"status": "ok"}
+
+
+@app.websocket("/ws/analyze")
+async def websocket_analyze(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        # File info receive করো
+        data = await websocket.receive_json()
+        file_path = data.get("file_path")
+        job_description = data.get("job_description", "")
+
+        if not file_path:
+            await websocket.send_json({"error": "No file path provided"})
+            return
+
+        # Agent 1: Parse
+        await websocket.send_json(
+            {
+                "step": 1,
+                "total": 5,
+                "status": "running",
+                "message": "📄 Parsing resume...",
+            }
+        )
+        await asyncio.sleep(0.5)
+        parsed = parser.parse(file_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        await websocket.send_json(
+            {
+                "step": 1,
+                "total": 5,
+                "status": "done",
+                "message": f"✅ Parsed ({parsed['word_count']} words)",
+            }
+        )
+
+        # Agent 2: Sections
+        await websocket.send_json(
+            {
+                "step": 2,
+                "total": 5,
+                "status": "running",
+                "message": "🔍 Extracting sections & skills...",
+            }
+        )
+        await asyncio.sleep(0.3)
+        sections = segmenter.segment(clean_text)
+        section_stats = segmenter.get_section_stats(sections)
+        skills = extractor.extract(clean_text)
+        await websocket.send_json(
+            {
+                "step": 2,
+                "total": 5,
+                "status": "done",
+                "message": f"✅ Found {section_stats['total_sections']} sections",
+            }
+        )
+
+        # Agent 3: ATS Score
+        await websocket.send_json(
+            {
+                "step": 3,
+                "total": 5,
+                "status": "running",
+                "message": "📊 Calculating ATS score...",
+            }
+        )
+        await asyncio.sleep(0.3)
+        features = _extract_features(
+            clean_text, section_stats, sections, parsed["word_count"]
+        )
+        ats_score = ats_predictor.predict(features)
+        quality = _quality_label(ats_score)
+        await websocket.send_json(
+            {
+                "step": 3,
+                "total": 5,
+                "status": "done",
+                "message": f"✅ ATS Score: {ats_score} ({quality})",
+            }
+        )
+
+        # Agent 4: LLM
+        await websocket.send_json(
+            {
+                "step": 4,
+                "total": 5,
+                "status": "running",
+                "message": "🧠 Running LLM analysis (Groq)...",
+            }
+        )
+        llm_skills = llm_analyzer.extract_skills(clean_text)
+        llm_feedback = llm_analyzer.get_ats_feedback(clean_text, ats_score, quality)
+        await websocket.send_json(
+            {
+                "step": 4,
+                "total": 5,
+                "status": "done",
+                "message": "✅ LLM analysis complete",
+            }
+        )
+
+        # Agent 5: Job Match
+        await websocket.send_json(
+            {
+                "step": 5,
+                "total": 5,
+                "status": "running",
+                "message": "🎯 Matching job description...",
+            }
+        )
+        match_score = None
+        match_level = None
+        if job_description.strip():
+            match_result = job_matcher.match(clean_text, job_description)
+            match_score = match_result["match_score"]
+            match_level = match_result["match_level"]
+        await websocket.send_json(
+            {
+                "step": 5,
+                "total": 5,
+                "status": "done",
+                "message": "✅ Job matching complete",
+            }
+        )
+
+        # Final result
+        improvements = []
+        if not section_stats["has_experience"]:
+            improvements.append("Add work experience section")
+        if not section_stats["has_projects"]:
+            improvements.append("Add projects section")
+        if features["metric_count"] < 2:
+            improvements.append("Add quantified achievements")
+        if parsed["word_count"] < 300:
+            improvements.append("Resume too short")
+
+        await websocket.send_json(
+            {
+                "step": 5,
+                "total": 5,
+                "status": "complete",
+                "message": "🎉 Analysis complete!",
+                "result": {
+                    "file_name": parsed["file_name"],
+                    "word_count": parsed["word_count"],
+                    "ats_score": ats_score,
+                    "quality_label": quality,
+                    "improvements": improvements,
+                    "section_stats": section_stats,
+                    "skills": skills,
+                    "llm_skills": llm_skills,
+                    "llm_feedback": llm_feedback,
+                    "match_score": match_score,
+                    "match_level": match_level,
+                },
+            }
+        )
+
+    except Exception as e:
+        await websocket.send_json(
+            {
+                "status": "error",
+                "message": f"Error: {str(e)}",
+            }
+        )
+    finally:
+        await websocket.close()

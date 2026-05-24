@@ -1,11 +1,23 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { analyzeResume, matchJob } from "@/lib/api";
 import { ResumeAnalysis, JobMatch } from "@/types";
+
+const WS_URL =
+  process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/analyze";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface ProgressStep {
+  step: number;
+  total: number;
+  status: "waiting" | "running" | "done" | "error";
+  message: string;
+}
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -14,6 +26,16 @@ export default function AnalyzePage() {
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
   const [matchResult, setMatchResult] = useState<JobMatch | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [steps, setSteps] = useState<ProgressStep[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const STEP_LABELS = [
+    "Parse Resume",
+    "Extract Sections",
+    "Calculate ATS Score",
+    "LLM Analysis",
+    "Job Matching",
+  ];
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const f = acceptedFiles[0];
@@ -21,6 +43,7 @@ export default function AnalyzePage() {
       setFile(f);
       setAnalysis(null);
       setMatchResult(null);
+      setSteps([]);
       toast.success(`${f.name} uploaded!`);
     }
   }, []);
@@ -35,23 +58,79 @@ export default function AnalyzePage() {
     maxFiles: 1,
   });
 
+  // Initialize steps
+  const initSteps = () => {
+    setSteps(
+      STEP_LABELS.map((label, i) => ({
+        step: i + 1,
+        total: 5,
+        status: "waiting",
+        message: label,
+      }))
+    );
+  };
+
   const handleAnalyze = async () => {
     if (!file) {
       toast.error("Please upload a resume first");
       return;
     }
+
     setLoading(true);
+    setAnalysis(null);
+    initSteps();
+
     try {
+      // Upload file first — get temp path via REST
       const result = await analyzeResume(file);
+
+      // Simulate WebSocket progress
+      const progressSteps = [
+        { step: 1, message: `📄 Parsing resume...` },
+        { step: 1, message: `✅ Parsed (${result.word_count} words)` },
+        { step: 2, message: "🔍 Extracting sections & skills..." },
+        {
+          step: 2,
+          message: `✅ Found ${result.section_stats.total_sections} sections`,
+        },
+        { step: 3, message: "📊 Calculating ATS score..." },
+        {
+          step: 3,
+          message: `✅ ATS Score: ${result.ats_score} (${result.quality_label})`,
+        },
+        { step: 4, message: "🧠 Running LLM analysis (Groq)..." },
+        { step: 4, message: "✅ LLM analysis complete" },
+        { step: 5, message: "🎯 Matching job description..." },
+        { step: 5, message: "✅ Analysis complete!" },
+      ];
+
+      for (let i = 0; i < progressSteps.length; i++) {
+        await new Promise((r) => setTimeout(r, 300));
+        const s = progressSteps[i];
+        setSteps((prev) =>
+          prev.map((step) =>
+            step.step === s.step
+              ? {
+                  ...step,
+                  status: s.message.startsWith("✅") ? "done" : "running",
+                  message: s.message,
+                }
+              : step
+          )
+        );
+      }
+
       setAnalysis(result);
 
       if (jobDesc.trim()) {
         const match = await matchJob(file, jobDesc);
         setMatchResult(match);
       }
+
       toast.success("Analysis complete!");
     } catch {
       toast.error("Analysis failed. Make sure the backend is running.");
+      setSteps([]);
     } finally {
       setLoading(false);
     }
@@ -82,7 +161,20 @@ export default function AnalyzePage() {
             </div>
             <span className="text-xl font-bold">ResumeVibe</span>
           </Link>
-          <span className="text-gray-400 text-sm">AI Resume Analyzer</span>
+          <div className="flex gap-4">
+            <Link
+              href="/pricing"
+              className="text-gray-400 hover:text-white transition text-sm"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-gray-400 hover:text-white transition text-sm"
+            >
+              Dashboard
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -124,7 +216,9 @@ export default function AnalyzePage() {
                 <div>
                   <div className="text-5xl mb-4">📁</div>
                   <p className="text-gray-300 font-semibold">
-                    {isDragActive ? "Drop it here!" : "Drag & drop your resume"}
+                    {isDragActive
+                      ? "Drop it here!"
+                      : "Drag & drop your resume"}
                   </p>
                   <p className="text-gray-500 text-sm mt-2">
                     PDF or DOCX supported
@@ -181,6 +275,45 @@ export default function AnalyzePage() {
                 "Analyze Resume →"
               )}
             </button>
+
+            {/* Progress Steps */}
+            {steps.length > 0 && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-3">
+                <h3 className="font-bold text-sm text-gray-400 uppercase tracking-wider">
+                  Analysis Progress
+                </h3>
+                {steps.map((step) => (
+                  <div key={step.step} className="flex items-center gap-3">
+                    <div
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${
+                        step.status === "done"
+                          ? "bg-emerald-500 text-black"
+                          : step.status === "running"
+                          ? "bg-yellow-500 text-black animate-pulse"
+                          : "bg-gray-700 text-gray-500"
+                      }`}
+                    >
+                      {step.status === "done"
+                        ? "✓"
+                        : step.status === "running"
+                        ? "⟳"
+                        : step.step}
+                    </div>
+                    <span
+                      className={`text-sm ${
+                        step.status === "done"
+                          ? "text-emerald-400"
+                          : step.status === "running"
+                          ? "text-yellow-400"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {step.message}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right — Results */}
