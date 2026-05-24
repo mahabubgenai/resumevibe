@@ -224,4 +224,4 @@ __pycache__/
 .next/
 node_modules/
 echo mlruns/ >> .gitignore
-echo mlflow.db >> .gitignore
+echo mlflow.db >> .gitignorebackend/app/ml/chroma_db/ 
