@@ -30,6 +30,7 @@ from pydantic import BaseModel as PydanticBase  # noqa: E402
 from app.ml.rag_pipeline import rag_pipeline  # noqa: E402
 from app.utils.pdf_generator import generate_analysis_pdf  # noqa: E402
 from fastapi.responses import Response  # noqa: E402
+from app.ml.interview_generator import generate_interview_qa  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -614,5 +615,32 @@ async def export_analysis_pdf(file: UploadFile = File(...), job_description: str
                 "Content-Disposition": "attachment; filename=resumevibe-analysis.pdf"
             },
         )
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/interview-prep")
+async def interview_prep(
+    file: UploadFile = File(...),
+    job_description: str = "",
+    job_title: str = "",
+):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        result = generate_interview_qa(clean_text, job_description, job_title)
+        return {"interview_qa": result, "status": "success"}
     finally:
         os.unlink(tmp_path)

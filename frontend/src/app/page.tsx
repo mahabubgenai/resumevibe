@@ -25,6 +25,11 @@ export default function Home() {
             >
               Try Free
             </Link>
+            <Link 
+              href="/interview"
+              className="text-gray-400 hover:text-white transition text-sm">
+              Interview Prep
+            </Link>
           </div>
         </div>
       </nav>
