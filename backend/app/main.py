@@ -31,6 +31,7 @@ from app.ml.rag_pipeline import rag_pipeline  # noqa: E402
 from app.utils.pdf_generator import generate_analysis_pdf  # noqa: E402
 from fastapi.responses import Response  # noqa: E402
 from app.ml.interview_generator import generate_interview_qa  # noqa: E402
+from app.ml.career_path import suggest_career_paths  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -642,5 +643,36 @@ async def interview_prep(
         clean_text = cleaner.clean(parsed["raw_text"])
         result = generate_interview_qa(clean_text, job_description, job_title)
         return {"interview_qa": result, "status": "success"}
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/career-path")
+async def career_path(file: UploadFile = File(...)):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+
+        llm_skills = llm_analyzer.extract_skills(clean_text)
+        job_titles = llm_skills.get("job_titles", [])
+        current_title = job_titles[0] if job_titles else ""
+        all_skills = llm_skills.get("skills", {}).get("technical", []) + llm_skills.get(
+            "skills", {}
+        ).get("tools", [])
+
+        result = suggest_career_paths(clean_text, current_title, all_skills)
+        return {"career_paths": result, "status": "success"}
     finally:
         os.unlink(tmp_path)
