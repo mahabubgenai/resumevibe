@@ -10,6 +10,7 @@ import JobSuggestions from "@/components/resume/JobSuggestions";
 import RAGChat from "@/components/resume/RAGChat";
 import InterviewPrep from "@/components/resume/InterviewPrep";
 import CareerPath from "@/components/resume/CareerPath";
+import ResumeRoaster from "@/components/resume/ResumeRoaster";
 
 interface ProgressStep {
   step: number;
@@ -422,7 +423,7 @@ export default function AnalyzePage() {
 
                 {/* Tabs */}
                 <div className="flex gap-2 border-b border-gray-800 pb-2 flex-wrap">
-                  {["overview", "skills", "feedback", "improve", "job finder", "coach", "interview", "career"].map((tab) => (
+                  {["overview", "skills", "feedback", "improve", "job finder", "coach", "interview", "career", "roast"].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -641,6 +642,10 @@ export default function AnalyzePage() {
                   {activeTab === "career" && (
                     <CareerPath file={file} />
                   )}
+
+                  {activeTab === "roast" && (
+                    <ResumeRoaster file={file} />
+                  )}  
                 </div>
               </>
             )}

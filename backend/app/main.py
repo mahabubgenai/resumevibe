@@ -32,6 +32,7 @@ from app.utils.pdf_generator import generate_analysis_pdf  # noqa: E402
 from fastapi.responses import Response  # noqa: E402
 from app.ml.interview_generator import generate_interview_qa  # noqa: E402
 from app.ml.career_path import suggest_career_paths  # noqa: E402
+from app.ml.resume_roaster import roast_resume  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -674,5 +675,28 @@ async def career_path(file: UploadFile = File(...)):
 
         result = suggest_career_paths(clean_text, current_title, all_skills)
         return {"career_paths": result, "status": "success"}
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/roast")
+async def resume_roast(file: UploadFile = File(...)):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        result = roast_resume(clean_text)
+        return {"roast": result, "status": "success"}
     finally:
         os.unlink(tmp_path)
