@@ -33,6 +33,7 @@ from fastapi.responses import Response  # noqa: E402
 from app.ml.interview_generator import generate_interview_qa  # noqa: E402
 from app.ml.career_path import suggest_career_paths  # noqa: E402
 from app.ml.resume_roaster import roast_resume  # noqa: E402
+from app.ml.resume_rewriter import rewrite_resume  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -698,5 +699,32 @@ async def resume_roast(file: UploadFile = File(...)):
         clean_text = cleaner.clean(parsed["raw_text"])
         result = roast_resume(clean_text)
         return {"roast": result, "status": "success"}
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/rewrite")
+async def resume_rewrite(
+    file: UploadFile = File(...),
+    job_title: str = "",
+    job_description: str = "",
+):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        result = rewrite_resume(clean_text, job_title, job_description)
+        return {"rewrite": result, "status": "success"}
     finally:
         os.unlink(tmp_path)
