@@ -34,6 +34,8 @@ from app.ml.interview_generator import generate_interview_qa  # noqa: E402
 from app.ml.career_path import suggest_career_paths  # noqa: E402
 from app.ml.resume_roaster import roast_resume  # noqa: E402
 from app.ml.resume_rewriter import rewrite_resume  # noqa: E402
+from app.ml.skill_roadmap import generate_skill_roadmap  # noqa: E402
+from pydantic import BaseModel as RoadmapBase  # noqa: E402
 
 
 class CheckoutRequest(BaseModel):
@@ -54,6 +56,12 @@ class JobSearchRequest(PydanticBase):
 class RAGQuestionRequest(BaseModel):
     question: str
     resume_text: str = ""
+
+
+class RoadmapRequest(RoadmapBase):
+    current_skills: list
+    target_role: str
+    timeline: str = "6 months"
 
 
 app = FastAPI(title="ResumeVibe API", version="1.0.0")
@@ -728,3 +736,13 @@ async def resume_rewrite(
         return {"rewrite": result, "status": "success"}
     finally:
         os.unlink(tmp_path)
+
+
+@app.post("/api/resume/skill-roadmap")
+async def skill_roadmap(req: RoadmapRequest):
+    result = generate_skill_roadmap(
+        req.current_skills,
+        req.target_role,
+        req.timeline,
+    )
+    return {"roadmap": result, "status": "success"}

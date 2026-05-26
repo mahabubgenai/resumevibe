@@ -12,6 +12,7 @@ import InterviewPrep from "@/components/resume/InterviewPrep";
 import CareerPath from "@/components/resume/CareerPath";
 import ResumeRoaster from "@/components/resume/ResumeRoaster";
 import ResumeRewriter from "@/components/resume/ResumeRewriter";
+import SkillRoadmap from "@/components/resume/SkillRoadmap";
 
 interface ProgressStep {
   step: number;
@@ -424,7 +425,7 @@ export default function AnalyzePage() {
 
                 {/* Tabs */}
                 <div className="flex gap-2 border-b border-gray-800 pb-2 flex-wrap">
-                  {["overview", "skills", "feedback", "improve", "job finder", "coach", "interview", "career", "roast", "rewrite"].map((tab) => (
+                  {["overview", "skills", "feedback", "improve", "job finder", "coach", "interview", "career", "roast", "rewrite", "roadmap"].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -650,6 +651,15 @@ export default function AnalyzePage() {
 
                   {activeTab === "rewrite" && (
                     <ResumeRewriter file={file} />
+                  )}
+
+                  {activeTab === "roadmap" && (
+                    <SkillRoadmap
+                      skills={[
+                        ...analysis.llm_skills.skills.technical,
+                        ...analysis.llm_skills.skills.tools,
+                      ]}
+                    />
                   )} 
                 </div>
               </>
