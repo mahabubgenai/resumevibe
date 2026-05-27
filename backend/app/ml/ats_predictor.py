@@ -132,10 +132,55 @@ class ATSPredictor:
         return {"mae": mae, "r2": r2}
 
     def load(self):
+        if not os.path.exists(self.model_path):
+            print("Model not found, training...")
+            data_path = "app/ml/resumes_processed.csv"
+            if not os.path.exists(data_path):
+                self._train_with_dummy_data()
+                return
+            self.train(data_path)
+            return
+
         with open(self.model_path, "rb") as f:
             self.model = pickle.load(f)
         with open(self.encoder_path, "rb") as f:
             self.label_encoder = pickle.load(f)
+
+    def _train_with_dummy_data(self):
+        """Minimal training data দিয়ে model তৈরি করো।"""
+        import pandas as pd
+        import numpy as np
+
+        print("Training with dummy data...")
+        n = 100
+        data = {
+            "has_education": np.random.randint(0, 2, n),
+            "has_experience": np.random.randint(0, 2, n),
+            "has_skills": np.random.randint(0, 2, n),
+            "has_projects": np.random.randint(0, 2, n),
+            "has_summary": np.random.randint(0, 2, n),
+            "has_cert": np.random.randint(0, 2, n),
+            "has_email": np.random.randint(0, 2, n),
+            "has_phone": np.random.randint(0, 2, n),
+            "metric_count": np.random.randint(0, 5, n),
+            "word_count": np.random.randint(100, 800, n),
+            "category_encoded": np.random.randint(0, 10, n),
+            "ats_score": np.random.uniform(20, 90, n),
+        }
+        df = pd.DataFrame(data)
+
+        X = df[FEATURE_COLS]
+        y = df["ats_score"]
+
+        self.model = xgb.XGBRegressor(n_estimators=50, max_depth=4, random_state=42)
+        self.model.fit(X, y, verbose=False)
+
+        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
+        with open(self.model_path, "wb") as f:
+            pickle.dump(self.model, f)
+        with open(self.encoder_path, "wb") as f:
+            pickle.dump(self.label_encoder, f)
+        print("✅ Dummy model trained and saved")
 
     def predict(self, features: dict) -> float:
         if self.model is None:
