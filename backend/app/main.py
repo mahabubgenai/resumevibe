@@ -4,6 +4,9 @@ import re
 import tempfile
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import (  # noqa: E402
     FastAPI,
     File,
@@ -13,32 +16,33 @@ from fastapi import (  # noqa: E402
     UploadFile,
     WebSocket,
 )
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
-from app.db.supabase_client import supabase
-from app.ml.ats_predictor import ATSPredictor
-from app.ml.career_path import suggest_career_paths
-from app.ml.interview_generator import generate_interview_qa
-from app.ml.job_fit import analyze_job_fit
-from app.ml.job_matcher import JobMatcher
-from app.ml.job_scraper import search_jobs_for_resume
-from app.ml.llm_analyzer import LLMResumeAnalyzer
-from app.ml.pipeline import run_pipeline
-from app.ml.rag_pipeline import rag_pipeline
-from app.ml.resume_roaster import roast_resume
-from app.ml.resume_rewriter import rewrite_resume
-from app.ml.skill_roadmap import generate_skill_roadmap
-from app.payments.stripe_handler import (
+from app.db.supabase_client import supabase  # noqa: E402
+from app.ml.ats_predictor import ATSPredictor  # noqa: E402
+from app.ml.career_path import suggest_career_paths  # noqa: E402
+from app.ml.cover_letter import generate_cover_letter  # noqa: E402
+from app.ml.interview_generator import generate_interview_qa  # noqa: E402
+from app.ml.job_fit import analyze_job_fit  # noqa: E402
+from app.ml.job_matcher import JobMatcher  # noqa: E402
+from app.ml.job_scraper import search_jobs_for_resume  # noqa: E402
+from app.ml.llm_analyzer import LLMResumeAnalyzer  # noqa: E402
+from app.ml.pipeline import run_pipeline  # noqa: E402
+from app.ml.rag_pipeline import rag_pipeline  # noqa: E402
+from app.ml.resume_roaster import roast_resume  # noqa: E402
+from app.ml.resume_rewriter import rewrite_resume  # noqa: E402
+from app.ml.skill_roadmap import generate_skill_roadmap  # noqa: E402
+from app.payments.stripe_handler import (  # noqa: E402
     create_checkout_session,
     create_portal_session,
     handle_webhook,
 )
-from app.utils.parser import ResumeParser, ResumeTextCleaner
-from app.utils.pdf_generator import generate_analysis_pdf
-from app.utils.segmenter import ResumeSectionSegmenter
-from app.utils.skill_extractor import SkillExtractor
+from app.utils.parser import ResumeParser, ResumeTextCleaner  # noqa: E402
+from app.utils.pdf_generator import generate_analysis_pdf  # noqa: E402
+from app.utils.segmenter import ResumeSectionSegmenter  # noqa: E402
+from app.utils.skill_extractor import SkillExtractor  # noqa: E402
 
 load_dotenv()
 
@@ -779,5 +783,36 @@ async def job_fit_analysis(
         clean_text = cleaner.clean(parsed["raw_text"])
         result = analyze_job_fit(clean_text, job_description, job_title)
         return {"job_fit": result, "status": "success"}
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/resume/cover-letter")
+async def cover_letter(
+    file: UploadFile = File(...),
+    job_title: str = Form(""),
+    company_name: str = Form(""),
+    job_description: str = Form(""),
+    tone: str = Form("professional"),
+):
+    allowed = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Only PDF and DOCX supported")
+
+    suffix = ".pdf" if "pdf" in file.content_type else ".docx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        parsed = parser.parse(tmp_path)
+        clean_text = cleaner.clean(parsed["raw_text"])
+        result = generate_cover_letter(
+            clean_text, job_title, company_name, job_description, tone
+        )
+        return {"cover_letter": result, "status": "success"}
     finally:
         os.unlink(tmp_path)
