@@ -30,6 +30,11 @@ export default function Home() {
               className="text-gray-400 hover:text-white transition text-sm">
               Interview Prep
             </Link>
+            <Link
+              href="/tracker" 
+              className="text-gray-400 hover:text-white transition text-sm">
+              Job Tracker
+            </Link>
           </div>
         </div>
       </nav>
